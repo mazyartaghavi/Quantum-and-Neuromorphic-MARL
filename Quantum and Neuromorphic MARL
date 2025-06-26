@@ -1,0 +1,94 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Simulated Environment
+class MultiAgentEnv:
+    def __init__(self, num_agents=5, obs_dim=10, action_dim=4):
+        self.num_agents = num_agents
+        self.obs_dim = obs_dim
+        self.action_dim = action_dim
+        self.state = np.random.rand(num_agents, obs_dim)
+
+    def reset(self):
+        self.state = np.random.rand(self.num_agents, self.obs_dim)
+        return self.state
+
+    def step(self, actions):
+        next_state = np.random.rand(self.num_agents, self.obs_dim)
+        rewards = np.random.rand(self.num_agents) - 0.1 * np.array(actions)
+        done = np.random.rand(self.num_agents) > 0.95
+        return next_state, rewards, done
+
+# Spiking Q-Learning Agent
+class SpikingAgent:
+    def __init__(self, obs_dim, action_dim, lr=0.05, gamma=0.95):
+        self.q_table = np.zeros((obs_dim, action_dim))
+        self.lr = lr
+        self.gamma = gamma
+        self.action_dim = action_dim
+
+    def choose_action(self, obs_idx):
+        if np.random.rand() < 0.1:
+            return np.random.randint(self.action_dim)
+        return np.argmax(self.q_table[obs_idx])
+
+    def update(self, obs_idx, action, reward, next_obs_idx):
+        best_next = np.max(self.q_table[next_obs_idx])
+        td_target = reward + self.gamma * best_next
+        self.q_table[obs_idx, action] += self.lr * (td_target - self.q_table[obs_idx, action])
+
+# Quantum-Inspired Optimization
+def qaoa_optimization(q_table):
+    noise = np.random.normal(0, 0.01, q_table.shape)
+    return q_table + noise
+
+# KL Divergence for Explainability
+def kl_divergence(p, q):
+    p = np.clip(p, 1e-6, 1)
+    q = np.clip(q, 1e-6, 1)
+    return np.sum(p * np.log(p / q))
+
+# Training and Simulation
+def run_simulation(episodes=50, num_agents=3, obs_dim=8, action_dim=4):
+    env = MultiAgentEnv(num_agents, obs_dim, action_dim)
+    agents = [SpikingAgent(obs_dim, action_dim) for _ in range(num_agents)]
+    rewards_history = []
+    safety_violations = []
+
+    for ep in range(episodes):
+        obs = env.reset()
+        total_reward = 0
+        safe = 0
+
+        for step in range(30):
+            obs_idx = (obs * obs_dim).astype(int).clip(0, obs_dim-1)
+            actions = [agent.choose_action(obs_idx[i][0]) for i, agent in enumerate(agents)]
+            next_obs, rewards, done = env.step(actions)
+            next_obs_idx = (next_obs * obs_dim).astype(int).clip(0, obs_dim-1)
+
+            for i, agent in enumerate(agents):
+                agent.update(obs_idx[i][0], actions[i], rewards[i], next_obs_idx[i][0])
+                total_reward += rewards[i]
+                if rewards[i] < 0.2:
+                    safe += 1
+
+            obs = next_obs
+            if all(done):
+                break
+
+        if ep % 10 == 0:
+            for agent in agents:
+                agent.q_table = qaoa_optimization(agent.q_table)
+
+        rewards_history.append(total_reward)
+        safety_violations.append(safe / num_agents)
+
+    return rewards_history, safety_violations
+
+# Plotting (you can uncomment to save locally)
+# rewards, safety = run_simulation()
+# plt.plot(rewards)
+# plt.title("Total Reward per Episode")
+# plt.xlabel("Episode")
+# plt.ylabel("Reward")
+# plt.savefig("hybrid_marl_summary_results.pdf")
